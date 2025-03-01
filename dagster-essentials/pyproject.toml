@@ -1,0 +1,28 @@
+[project]
+name = "dagster_essentials"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "dagster",
+    "dagster-cloud",
+    "pandas>=2.2.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "dagster-webserver",
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.dagster]
+module_name = "src.definitions"
+code_location_name = "src"
+
+[tool.setuptools.packages.find]
+exclude=["tests"]
