@@ -1,10 +1,14 @@
-from dagster import Definitions, load_assets_from_modules
+import os
 
-from . import assets
+import dagster as dg
+from dagster_duckdb import DuckDBResource
+
+from .assets import metrics, trips
 
 
-all_assets = load_assets_from_modules([assets])
+all_assets = dg.load_assets_from_modules([trips, metrics])
 
-defs = Definitions(
+defs = dg.Definitions(
     assets=all_assets,
+    resources={"duckdb": DuckDBResource(database=os.getenv("DUCKDB_DATABASE"))},
 )
