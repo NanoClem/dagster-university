@@ -6,7 +6,9 @@ from . import constants
 
 
 @dg.asset(
-    group_name="extraction",
+    group_name="ingestion",
+    kinds={"http", "parquet"},
+    description="Request taxi trips's parquet file over http",
 )
 def taxi_trips_file() -> None:
     month_to_fetch = "2023-03"
@@ -21,7 +23,9 @@ def taxi_trips_file() -> None:
 
 
 @dg.asset(
-    group_name="extraction",
+    group_name="ingestion",
+    kinds={"http", "parquet"},
+    description="Request taxi zones's parquet file over http",
 )
 def taxi_zones_file() -> None:
     raw_zones = rq.get(
@@ -35,6 +39,8 @@ def taxi_zones_file() -> None:
 @dg.asset(
     deps=[taxi_trips_file],
     group_name="ingestion",
+    kinds={"duckdb"},
+    description="Save taxi trips data from parquet file to duckdb",
 )
 def taxi_trips(duckdb: DuckDBResource) -> dg.MaterializeResult:
     with duckdb.get_connection() as conn:
@@ -69,8 +75,10 @@ def taxi_trips(duckdb: DuckDBResource) -> dg.MaterializeResult:
 @dg.asset(
     deps=[taxi_zones_file],
     group_name="ingestion",
+    kinds={"duckdb"},
+    description="Save taxi zones data from parquet file to duckdb",
 )
-def taxi_zones(duckdb: DuckDBResource) -> None:
+def taxi_zones(duckdb: DuckDBResource) -> dg.MaterializeResult:
     with duckdb.get_connection() as conn:
         conn.execute(f"""
             CREATE OR REPLACE TABLE zones AS (
