@@ -8,6 +8,8 @@ setup(
         "dagster-cloud",
         "dagster-duckdb",
         "pandas>=2.2.3",
+        "geopandas>=1.0.1",
+        "matplotlib>=3.9.4",
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )

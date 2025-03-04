@@ -8,6 +8,8 @@ dependencies = [
     "dagster",
     "dagster-cloud",
     "dagster-duckdb>=0.26.3",
+    "geopandas>=1.0.1",
+    "matplotlib>=3.9.4",
     "pandas>=2.2.3",
 ]
 
