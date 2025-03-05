@@ -1,3 +1,5 @@
+import os
+
 import dagster as dg
 import requests as rq
 from dagster_duckdb import DuckDBResource
@@ -10,16 +12,19 @@ from . import constants
     kinds={"http", "parquet"},
     description="Request taxi trips's parquet file over http",
 )
-def taxi_trips_file() -> None:
+def taxi_trips_file() -> dg.MaterializeResult:
     month_to_fetch = "2023-03"
     raw_trips = rq.get(
         f"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{month_to_fetch}.parquet"
     )
+    filename = constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)
 
-    with open(
-        constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch), "wb"
-    ) as output_file:
+    with open(filename, "wb") as output_file:
         output_file.write(raw_trips.content)
+
+    return dg.MaterializeResult(
+        metadata={"file_size_kb": dg.MetadataValue.int(os.stat(filename).st_size)}
+    )
 
 
 @dg.asset(
@@ -27,13 +32,18 @@ def taxi_trips_file() -> None:
     kinds={"http", "parquet"},
     description="Request taxi zones's parquet file over http",
 )
-def taxi_zones_file() -> None:
+def taxi_zones_file() -> dg.MaterializeResult:
     raw_zones = rq.get(
         "https://community-engineering-artifacts.s3.us-west-2.amazonaws.com/dagster-university/data/taxi_zones.csv"
     )
+    filename = constants.TAXI_ZONES_FILE_PATH
 
-    with open(constants.TAXI_ZONES_FILE_PATH, "wb") as zones_file:
+    with open(filename, "wb") as zones_file:
         zones_file.write(raw_zones.content)
+
+    return dg.MaterializeResult(
+        metadata={"file_size_kb": dg.MetadataValue.int(os.stat(filename).st_size)}
+    )
 
 
 @dg.asset(
