@@ -46,7 +46,7 @@ def trips_by_zone(duckdb: DuckDBResource) -> dg.Output[gpd.GeoDataFrame]:
     group_name="metrics",
     kinds={"duckdb", "pandas"},
 )
-def taxi_trips_by_week(duckdb: DuckDBResource) -> dg.Output[pd.DataFrame]:
+def trips_by_week(duckdb: DuckDBResource) -> dg.Output[pd.DataFrame]:
     query = """
         WITH weekly_trips AS (
             SELECT
