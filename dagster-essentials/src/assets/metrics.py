@@ -7,6 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from dagster_duckdb import DuckDBResource
 
+from ..partitions import weekly_partition
+
 
 @dg.asset(
     deps=["taxi_trips", "taxi_zones"],
@@ -45,9 +47,14 @@ def trips_by_zone(duckdb: DuckDBResource) -> dg.Output[gpd.GeoDataFrame]:
     deps=["taxi_trips"],
     group_name="metrics",
     kinds={"duckdb", "pandas"},
+    partitions_def=weekly_partition,
 )
-def trips_by_week(duckdb: DuckDBResource) -> dg.Output[pd.DataFrame]:
-    query = """
+def trips_by_week(
+    context: dg.AssetExecutionContext, duckdb: DuckDBResource
+) -> dg.Output[pd.DataFrame]:
+    weekly_partition = context.partition_key
+
+    query = f"""
         WITH weekly_trips AS (
             SELECT
                 DATE_TRUNC('week', pickup_datetime) + INTERVAL '1 day' AS period,
@@ -56,7 +63,9 @@ def trips_by_week(duckdb: DuckDBResource) -> dg.Output[pd.DataFrame]:
                 SUM(trip_distance) as trip_distance,
                 SUM(total_amount) as total_amount
             FROM trips
-            WHERE pickup_datetime BETWEEN '2021-03-01' AND '2023-03-01'
+            WHERE 
+                period >= '{weekly_partition}' 
+                AND period < '{weekly_partition}'::DATE + INTERVAL '1 week'
             GROUP BY period
         )
         SELECT 

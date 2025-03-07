@@ -1,29 +1,37 @@
 import os
+from datetime import datetime
 
 import dagster as dg
 import requests as rq
 from dagster_duckdb import DuckDBResource
 
 from . import constants
+from .. import utils
+from ..partitions import monthly_partition
 
 
 @dg.asset(
     group_name="ingestion",
     kinds={"http", "parquet"},
     description="Request taxi trips's parquet file over http",
+    partitions_def=monthly_partition,
 )
-def taxi_trips_file() -> dg.MaterializeResult:
-    month_to_fetch = "2023-03"
-    raw_trips = rq.get(
-        f"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{month_to_fetch}.parquet"
-    )
-    filename = constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)
+def taxi_trips_file(context: dg.AssetExecutionContext) -> dg.MaterializeResult:
+    fetch_month = utils.change_date_format(context.partition_key, "%Y-%m-%d", "%Y-%m")
+    url = f"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{fetch_month}.parquet"
+
+    raw_trips = rq.get(url)
+    filename = constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(fetch_month)
 
     with open(filename, "wb") as output_file:
         output_file.write(raw_trips.content)
 
     return dg.MaterializeResult(
-        metadata={"file_size_kb": dg.MetadataValue.int(os.stat(filename).st_size)}
+        metadata={
+            "fetched_month": fetch_month,
+            "file_size_kb": dg.MetadataValue.int(os.stat(filename).st_size),
+            "url": url,
+        }
     )
 
 
@@ -51,24 +59,30 @@ def taxi_zones_file() -> dg.MaterializeResult:
     group_name="ingestion",
     kinds={"duckdb"},
     description="Save taxi trips data from parquet file to duckdb",
+    partitions_def=monthly_partition,
+    automation_condition=dg.AutomationCondition.eager(),
 )
-def taxi_trips(duckdb: DuckDBResource) -> dg.MaterializeResult:
+def taxi_trips(
+    context: dg.AssetExecutionContext, duckdb: DuckDBResource
+) -> dg.MaterializeResult:
+    trips_month = utils.change_date_format(context.partition_key, "%Y-%m-%d", "%Y-%m")
+
     with duckdb.get_connection() as conn:
-        conn.execute("""
-            CREATE OR REPLACE TABLE trips AS (
-                SELECT
-                    VendorID as vendor_id,
-                    PULocationID as pickup_zone_id,
-                    DOLocationID as dropoff_zone_id,
-                    RatecodeID as rate_code_id,
-                    payment_type as payment_type,
-                    tpep_dropoff_datetime as dropoff_datetime,
-                    tpep_pickup_datetime as pickup_datetime,
-                    trip_distance as trip_distance,
-                    passenger_count as passenger_count,
-                    total_amount as total_amount
-                FROM 'data/raw/taxi_trips_2023-03.parquet'
+        conn.execute(f"""
+            CREATE TABLE IF NOT EXISTS trips (
+                vendor_id INTEGER, pickup_zone_id INTEGER, dropoff_zone_id INTEGER,
+                rate_code_id DOUBLE, payment_type INTEGER, dropoff_datetime TIMESTAMP,
+                pickup_datetime TIMESTAMP, trip_distance DOUBLE, passenger_count DOUBLE,
+                total_amount DOUBLE, partition_date VARCHAR
             );
+            
+            DELETE FROM trips WHERE partition_date = '{trips_month}';
+            
+            INSERT INTO trips
+            SELECT
+                VendorID, PULocationID, DOLocationID, RatecodeID, payment_type, tpep_dropoff_datetime,
+                tpep_pickup_datetime, trip_distance, passenger_count, total_amount, '{trips_month}' as partition_date
+            FROM '{constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(trips_month)}';
         """)
         preview_df = conn.execute("SELECT * FROM trips LIMIT 10").fetch_df()
         row_count = conn.execute("SELECT COUNT(*) FROM trips").fetchone()
@@ -77,6 +91,7 @@ def taxi_trips(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return dg.MaterializeResult(
         metadata={
             "row_count": dg.IntMetadataValue(count),
+            "fetched_month": trips_month,
             "preview": dg.MarkdownMetadataValue(preview_df.to_markdown(index=False)),
         }
     )
