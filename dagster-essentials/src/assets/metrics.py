@@ -1,12 +1,10 @@
-import base64
-from io import BytesIO
-
 import dagster as dg
 import geopandas as gpd
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 from dagster_duckdb import DuckDBResource
 
+from .. import utils
 from ..partitions import weekly_partition
 
 
@@ -104,14 +102,9 @@ def manhattan_map(
     ax.set_xlim([-74.05, -73.90])  # Adjust longitude range
     ax.set_ylim([40.70, 40.82])  # Adjust latitude range
 
-    # Convert img into a savable format
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    plt.close(fig)
-    img_data = base64.b64encode(buffer.getvalue())
-
     # Prepare markdown of img to show it in Dagster UI
-    img_md = f"![img](data:image/png;base64,{img_data.decode()})"
+    img_md = utils.fig_to_markdown(fig)
+    plt.close(fig)
 
     return dg.MaterializeResult(
         metadata={

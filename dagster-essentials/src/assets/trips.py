@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 import dagster as dg
 import requests as rq
