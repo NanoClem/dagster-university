@@ -1,0 +1,21 @@
+[project]
+name = "instacart-analytics"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.12.6"
+dependencies = [
+    "dagster>=1.10.4",
+    "dagster-postgres>=0.26.4",
+    "kaggle>=1.6.17",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "ruff>=0.9.10",
+]
+
+[tool.dagster]
+module_name = "dagster_pipelines.definitions"
+code_location_name = "dagster_pipelines"
